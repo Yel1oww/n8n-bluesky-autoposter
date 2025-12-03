@@ -1,7 +1,4 @@
-{"variant":"standard","title":"n8n-bluesky-autoposter README","id":"58241"}
-n8n-bluesky-autoposter
-
-An automated Bluesky posting workflow built with n8n that pulls content from any RSS feed, uses an AI model (Ollama or other) to reformat it into a short, professional post, and automatically publishes it to Bluesky.
+n8n-bluesky-autoposter is a automated Bluesky posting workflow built with n8n that pulls content from any RSS feed, uses an AI model (Ollama or other) to reformat it into a short, professional post, and automatically publishes it to Bluesky.
 
 This workflow is fully customizable and can be adapted for:
 - News aggregation
