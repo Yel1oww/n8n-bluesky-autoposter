@@ -1,0 +1,293 @@
+{
+  "name": "Automated Cybersecurity Posts Bluesky",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "1f120d99-f9b9-4f7a-a594-2d347a3d9cb2",
+      "name": "Start Workflow",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -240,
+        1568
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "https://example/en-us/feed/",
+        "options": {}
+      },
+      "id": "14776b0e-523d-4dd6-a7c2-6b78951a6a25",
+      "name": "RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        112,
+        1568
+      ],
+      "typeVersion": 1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.title }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        336,
+        1568
+      ],
+      "id": "c4b62760-4ad1-434a-920a-964622a9fac0",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert social media manager for example on Bluesky.\n\nYour task is to rewrite the latest example-related article into a short, authoritative, and educational post.\n\nUse the following variables:\n- Title: {{ $json.title }}\n- Content: {{ $json.content }}\n\n### RULES:\n- CHARACTER LIMIT: 250 maximum.\n- Output must include:\n  - \"tweet_content\": the rewritten post.\n  - \"character_count\": count of total characters in tweet_content (e.g. \"184/250\").\n  - \"status\": always \"Published\".\n- Do NOT include links, @handles, or hashtags unless they are explicitly in the provided content.\n- Avoid emojis, hype, or casual language.\n- Tone: **professional, credible, and educational** — write as if briefing cybersecurity professionals or informed readers.\n- Focus on the core insight, risk, or significance of the article.\n- Use clear, factual, and concise language. Avoid speculation or unverified claims.\n- Write in full sentences with proper punctuation.\n- If the article discusses a threat, vulnerability, or breach, highlight its impact or mitigation insight.\n\n### OUTPUT FORMAT (JSON):\n{\n  \"tweet_content\": \"[Your rewritten post here]\",\n  \"character_count\": \"[X/250]\",\n  \"status\": \"Published\"\n}\n\n### EXAMPLE OUTPUT:\n{\n  \"tweet_content\": \"A new phishing campaign is targeting corporate Microsoft 365 users through fake MFA prompts. Experts recommend reviewing login alerts and enforcing hardware-based authentication.\",\n  \"character_count\": \"231/250\",\n  \"status\": \"Published\"\n}\n",
+        "options": {}
+      },
+      "id": "5da552d5-929c-479f-8b38-9d25166d2696",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        528,
+        1568
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI JSON output safely and append unique timestamp\nconst inputString = $input.first().json.output;\n\nfunction safeParse(str) {\n  let jsonObj;\n  try {\n    jsonObj = JSON.parse(str);\n  } catch (e) {\n    const match = str.match(/\\{[\\s\\S]*\\}/);\n    if (match) {\n      try {\n        jsonObj = JSON.parse(match[0]);\n      } catch {\n        return { json: { error: 'Failed to parse', raw: str } };\n      }\n    } else {\n      return { json: { error: 'Invalid JSON', raw: str } };\n    }\n  }\n  // Append timestamp for uniqueness\n  return { json: { ...jsonObj } };\n}\n\nreturn [safeParse(inputString)];"
+      },
+      "id": "6bee23cf-f290-4ad5-bf43-d594a03ad068",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        832,
+        1568
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "$BLUESKY_HANDLE",
+              "value": "yourhandle.bsky.social"
+            },
+            {
+              "name": "$BLUESKY_APP_PASSWORD",
+              "value": "your-app-password-here"
+            },
+            {
+              "name": "tweet_content",
+              "value": "={{ $json.tweet_content }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6193e0d3-91ed-493e-8684-855cecc0cb7e",
+      "name": "Set Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1008,
+        1568
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "identifier",
+              "value": "={{ $json.$BLUESKY_HANDLE }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $json.$BLUESKY_APP_PASSWORD }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "50ae9d1d-2a78-443b-985b-2d28b177d808",
+      "name": "Create Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1184,
+        1568
+      ],
+      "typeVersion": 4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.accessJwt }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"repo\": \"your-handle.bsky.social\",\n  \"collection\": \"app.bsky.feed.post\",\n  \"record\": {\n    \"text\": \"{{ $('Parse AI Response').item.json.tweet_content }}\",\n    \"createdAt\": \"{{ new Date().toISOString() }}\",\n    \"$type\": \"app.bsky.feed.post\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ef68ad12-2922-464d-a626-ec7595ca9364",
+      "name": "Post to Bluesky",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1344,
+        1568
+      ],
+      "typeVersion": 4
+    },
+    {
+      "parameters": {
+        "model": "phi3_cyber:latest",
+        "options": {}
+      },
+      "id": "5469efc0-961d-4b84-bca8-9cde33cd0d62",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "position": [
+        528,
+        1760
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "ollamaApi": {
+          "id": "dsGm2q0LUsg5SUeH",
+          "name": "Ollama account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start Workflow": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CyberSec News": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Create Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Session": {
+      "main": [
+        [
+          {
+            "node": "Post to Bluesky",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a4f0dd1e-26d2-4de9-8100-591b37a53e55",
+  "meta": {
+    "instanceId": "f7cc8102df114e9b3645d79f5c32257fdded4ef4fcd46cd00a2c316c2a6e512a"
+  },
+  "id": "GtI0tqg3Xwre8TwM",
+  "tags": []
+}
